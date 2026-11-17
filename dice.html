@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>掷骰子和的分布 · 中心极限定理模拟实验</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='10' width='80' height='80' rx='16' fill='%232563eb'/><circle cx='32' cy='32' r='8' fill='white'/><circle cx='68' cy='32' r='8' fill='white'/><circle cx='50' cy='50' r='8' fill='white'/><circle cx='32' cy='68' r='8' fill='white'/><circle cx='68' cy='68' r='8' fill='white'/></svg>">
+<script src="https://fastly.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --accent: #f59e0b;
+    --red: #ef4444;
+    --green: #10b981;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.5;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* 顶部标题 */
+  header { margin-bottom: 20px; }
+  header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  header p { color: var(--muted); font-size: 14px; margin-top: 6px; max-width: 760px; }
+  header .formula { font-family: "SF Mono", Menlo, Consolas, monospace; background: #eef2ff; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #4338ca; }
+
+  /* 主布局 */
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .panel + .panel { margin-top: 16px; }
+  .panel h3 {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px;
+  }
+
+  /* 滑块 */
+  .slider-row { margin-bottom: 18px; }
+  .slider-row label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+  .slider-row label .val { font-family: "SF Mono", Menlo, monospace; color: var(--primary); font-weight: 700; }
+  input[type=range] { width: 100%; accent-color: var(--primary); cursor: pointer; }
+  .scale-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* 按钮 */
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  button:hover { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
+  button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  button.primary:hover { background: #1d4ed8; color: #fff; }
+  button.wide { grid-column: 1 / -1; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 复选框 */
+  .check-list { display: flex; flex-direction: column; gap: 10px; }
+  .check-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+  .check-item input { width: 16px; height: 16px; accent-color: var(--primary); }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+
+  /* 图表 */
+  .chart-card { padding: 18px 18px 8px; }
+  #chart { width: 100%; height: 460px; }
+  .chart-meta { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 10px; font-size: 13px; color: var(--muted); }
+  .chart-meta strong { color: var(--text); }
+
+  /* 统计卡片 */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  }
+  .stat .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat .row { display: flex; align-items: baseline; gap: 8px; }
+  .stat .exp { font-family: "SF Mono", Menlo, monospace; font-size: 20px; font-weight: 700; color: var(--primary); }
+  .stat .theory { font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: var(--muted); }
+
+  /* 教学要点 */
+  .notes {
+    margin-top: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 18px 22px;
+  }
+  .notes h3 { font-size: 15px; color: #92400e; margin-bottom: 8px; }
+  .notes ul { padding-left: 20px; font-size: 13px; color: #78350f; line-height: 1.8; }
+
+  .dice-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; min-height: 36px; }
+  .die {
+    width: 28px; height: 28px; background: #fff; border: 1.5px solid var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+    font-family: "SF Mono", Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>掷骰子和的分布实验</h1>
+    <p>
+      一次掷 <span class="formula">n</span> 颗公平骰子，记录它们的点数之和。观察：当 <span class="formula">n</span> 从 1 逐渐增大时，
+      这个"和"的概率分布是怎样从<b>均匀分布</b>变成<b>钟形正态分布</b>的？这就是<b>中心极限定理</b>最经典的直观演示。
+    </p>
+  </header>
+
+  <div class="layout">
+    <!-- 控制面板 -->
+    <aside>
+      <div class="panel">
+        <h3>实验参数</h3>
+        <div class="slider-row">
+          <label>骰子数量 n <span class="val" id="nVal">1</span></label>
+          <input type="range" id="nSlider" min="1" max="20" step="1" value="1">
+          <div class="scale-ticks"><span>1</span><span>5</span><span>10</span><span>15</span><span>20</span></div>
+        </div>
+        <div class="slider-row">
+          <label>每次投掷批次 <span class="val" id="batchVal">1000</span></label>
+          <input type="range" id="batchSlider" min="100" max="20000" step="100" value="1000">
+          <div class="scale-ticks"><span>100</span><span>20000</span></div>
+        </div>
+
+        <div class="btn-grid">
+          <button class="primary" id="btnOnce">投一批</button>
+          <button id="btnAuto">自动连投</button>
+          <button class="wide" id="btnReset">重置实验</button>
+        </div>
+
+        <div style="margin-top:14px; font-size:13px; color:var(--muted);">
+          累计投掷次数：<strong id="totalTrials" style="font-family:monospace; color:var(--text);">0</strong>
+        </div>
+        <div class="dice-row" id="diceRow"></div>
+      </div>
+
+      <div class="panel">
+        <h3>叠加显示</h3>
+        <div class="check-list">
+          <label class="check-item"><input type="checkbox" id="showHist" checked>
+            <span class="swatch" style="background:#3b82f6;"></span> 经验频率（模拟）</label>
+          <label class="check-item"><input type="checkbox" id="showPmf" checked>
+            <span class="swatch" style="background:#10b981;"></span> 精确理论概率（n 颗卷积）</label>
+          <label class="check-item"><input type="checkbox" id="showNorm" checked>
+            <span class="swatch" style="background:#ef4444;"></span> 正态拟合曲线 N(μ, σ²)</label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 图表区 -->
+    <main>
+      <div class="panel chart-card">
+        <div class="chart-meta">
+          <span>当前：掷 <strong id="chartN">1</strong> 颗骰子 · 取值范围 [<strong id="rangeInfo">1, 6</strong>]</span>
+          <span>理论均值 μ = <strong id="muInfo">3.5</strong> · 理论 σ = <strong id="sigmaInfo">1.71</strong></span>
+        </div>
+        <div id="chart"></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="label">经验均值 / 理论均值</div>
+          <div class="row"><span class="exp" id="sMean">—</span><span class="theory" id="tMean">—</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">经验标准差 / 理论 σ</div>
+          <div class="row"><span class="exp" id="sStd">—</span><span class="theory" id="tStd">—</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">经验偏度（应→0）</div>
+          <div class="row"><span class="exp" id="sSkew">—</span><span class="theory">对称</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">经验峰度（应→0）</div>
+          <div class="row"><span class="exp" id="sKurt">—</span><span class="theory">正态=0</span></div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <h3>观察要点（中心极限定理）</h3>
+        <ul>
+          <li><b>n=1</b>：每个点数 1–6 等概率，分布是<b>一条水平直线</b>（均匀分布）。</li>
+          <li><b>n=2</b>：和的取值 2–12，中间 7 概率最高，呈<b>三角形</b>。</li>
+          <li><b>n=3、4、5…</b>：分布不断被"磨平"边缘、抬高中心，轮廓越来越接近<b>钟形</b>。</li>
+          <li><b>n 较大（如 10 以上）</b>：经验柱状图几乎与红色正态曲线重合，偏度、峰度趋近 0。</li>
+          <li>关键结论：<b>无论单个随机变量原本是什么分布，大量独立同分布随机变量之和，总会趋近正态分布</b>——这就是中心极限定理。</li>
+        </ul>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ============ 状态 ============
+const state = {
+  n: 1,
+  batch: 1000,
+  counts: {},      // sum -> 次数
+  total: 0,
+  autoTimer: null,
+};
+
+const chart = echarts.init(document.getElementById('chart'));
+
+// ============ 理论 PMF（卷积） ============
+// 返回 Map: sum -> prob
+function theoreticalPmf(n) {
+  // p[k] 表示掷 k 颗骰子和为 s 的概率
+  let prev = { };
+  for (let v = 1; v <= 6; v++) prev[v] = 1/6;
+  for (let k = 2; k <= n; k++) {
+    const cur = {};
+    const min = k, max = 6*k;
+    for (let s = min; s <= max; s++) {
+      let p = 0;
+      for (let d = 1; d <= 6; d++) {
+        if (prev[s - d] !== undefined) p += prev[s - d] / 6;
+      }
+      cur[s] = p;
+    }
+    prev = cur;
+  }
+  return prev;
+}
+
+// 理论均值、标准差（单颗骰子：均值3.5，方差35/12）
+const SINGLE_MEAN = 3.5;
+const SINGLE_VAR = 35/12;
+function theoryMean(n) { return n * SINGLE_MEAN; }
+function theoryStd(n)  { return Math.sqrt(n * SINGLE_VAR); }
+
+// 正态分布概率密度
+function normalPdf(x, mu, sigma) {
+  return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mu) / sigma, 2));
+}
+
+// ============ 模拟一次 ============
+function rollOnce(n) {
+  let s = 0;
+  for (let i = 0; i < n; i++) s += 1 + Math.floor(Math.random() * 6);
+  return s;
+}
+
+function runBatch() {
+  const n = state.n;
+  // 清掉旧 n 的数据
+  state.counts = {};
+  state.total = 0;
+  // 实际：换 n 时重置
+  const cnt = new Array(6*n + 1).fill(0);
+  for (let i = 0; i < state.batch; i++) cnt[rollOnce(n)]++;
+  state.counts = cnt;
+  state.total = state.batch;
+  updateDisplay(cnt, n);
+  showLastDice(n);
+}
+
+// 换 n 时重置
+function resetCounts() {
+  const n = state.n;
+  state.counts = new Array(6*n + 1).fill(0);
+  state.total = 0;
+  updateDisplay(state.counts, n);
+  document.getElementById('diceRow').innerHTML = '';
+}
+
+function addBatch() {
+  const n = state.n;
+  if (!state.counts || state.counts.length !== 6*n + 1) state.counts = new Array(6*n + 1).fill(0);
+  for (let i = 0; i < state.batch; i++) state.counts[rollOnce(n)]++;
+  state.total += state.batch;
+  updateDisplay(state.counts, n);
+  showLastDice(n);
+}
+
+// ============ 渲染 ============
+function updateDisplay(counts, n) {
+  const min = n, max = 6 * n;
+  const mu = theoryMean(n);
+  const sigma = theoryStd(n);
+
+  // 经验频率
+  const expData = [];
+  for (let s = min; s <= max; s++) {
+    const f = state.total > 0 ? (counts[s] || 0) / state.total : 0;
+    expData.push([s, f]);
+  }
+
+  // 理论 PMF
+  const pmf = theoreticalPmf(n);
+  const pmfData = [];
+  for (let s = min; s <= max; s++) pmfData.push([s, pmf[s] || 0]);
+
+  // 正态拟合曲线（连续采样）
+  const normData = [];
+  const steps = 200;
+  for (let i = 0; i <= steps; i++) {
+    const x = min + (max - min) * i / steps;
+    normData.push([x, normalPdf(x, mu, sigma)]);
+  }
+
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { show: false },
+    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'value', min: min - 0.5, max: max + 0.5,
+      name: '点数和 s', nameLocation: 'middle', nameGap: 28,
+    },
+    yAxis: {
+      type: 'value', name: '概率 / 频率',
+      axisLabel: { formatter: v => v.toFixed(3) },
+    },
+    series: [
+      {
+        name: '经验频率', type: 'bar', data: expData,
+        itemStyle: { color: '#3b82f6', opacity: 0.85 },
+        barWidth: n > 10 ? '60%' : '80%',
+        showSymbol: false,
+      },
+      {
+        name: '理论PMF', type: 'scatter', data: pmfData,
+        symbolSize: 9,
+        itemStyle: { color: '#10b981' },
+      },
+      {
+        name: '正态拟合', type: 'line', data: normData,
+        smooth: true, showSymbol: false,
+        lineStyle: { color: '#ef4444', width: 2.5 },
+      },
+    ].filter(s => {
+      if (s.name === '经验频率') return document.getElementById('showHist').checked;
+      if (s.name === '理论PMF') return document.getElementById('showPmf').checked;
+      if (s.name === '正态拟合') return document.getElementById('showNorm').checked;
+      return true;
+    }),
+  }, true);
+
+  // 信息区
+  document.getElementById('rangeInfo').textContent = `${n}, ${6*n}`;
+  document.getElementById('muInfo').textContent = mu.toFixed(2);
+  document.getElementById('sigmaInfo').textContent = sigma.toFixed(2);
+  document.getElementById('totalTrials').textContent = state.total.toLocaleString();
+
+  // 统计量
+  if (state.total > 0) {
+    let sum = 0, sum2 = 0, sum3 = 0, sum4 = 0;
+    for (let s = min; s <= max; s++) {
+      const c = counts[s] || 0;
+      sum += s * c; sum2 += s*s * c; sum3 += s*s*s * c; sum4 += s*s*s*s * c;
+    }
+    const N = state.total;
+    const mean = sum / N;
+    const m2 = sum2/N - mean*mean;
+    const m3 = sum3/N - 3*mean*sum2/N + 2*mean*mean*mean;
+    const m4 = sum4/N - 4*mean*sum3/N + 6*mean*mean*sum2/N - 3*mean*mean*mean*mean;
+    const std = Math.sqrt(m2);
+    const skew = m2 > 1e-9 ? m3 / Math.pow(m2, 1.5) : 0;
+    const kurt = m2 > 1e-9 ? m4 / (m2*m2) - 3 : 0;
+    document.getElementById('sMean').textContent = mean.toFixed(2);
+    document.getElementById('sStd').textContent = std.toFixed(2);
+    document.getElementById('sSkew').textContent = skew.toFixed(3);
+    document.getElementById('sKurt').textContent = kurt.toFixed(3);
+  } else {
+    document.getElementById('sMean').textContent = '—';
+    document.getElementById('sStd').textContent = '—';
+    document.getElementById('sSkew').textContent = '—';
+    document.getElementById('sKurt').textContent = '—';
+  }
+  document.getElementById('tMean').textContent = '/ ' + mu.toFixed(2);
+  document.getElementById('tStd').textContent = '/ ' + sigma.toFixed(2);
+}
+
+function showLastDice(n) {
+  const row = document.getElementById('diceRow');
+  row.innerHTML = '';
+  // 只展示前 n 个骰子（最多显示 10 个避免拥挤）
+  const showN = Math.min(n, 10);
+  for (let i = 0; i < showN; i++) {
+    const d = 1 + Math.floor(Math.random() * 6);
+    const el = document.createElement('div');
+    el.className = 'die';
+    el.textContent = d;
+    row.appendChild(el);
+  }
+  if (n > 10) {
+    const el = document.createElement('div');
+    el.className = 'die';
+    el.style.borderStyle = 'dashed';
+    el.style.color = '#94a3b8';
+    el.textContent = '···';
+    row.appendChild(el);
+  }
+}
+
+// ============ 事件 ============
+document.getElementById('nSlider').addEventListener('input', e => {
+  state.n = parseInt(e.target.value);
+  document.getElementById('nVal').textContent = state.n;
+  if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; document.getElementById('btnAuto').textContent='自动连投'; }
+  resetCounts();
+});
+
+document.getElementById('batchSlider').addEventListener('input', e => {
+  state.batch = parseInt(e.target.value);
+  document.getElementById('batchVal').textContent = state.batch.toLocaleString();
+});
+
+document.getElementById('btnOnce').addEventListener('click', () => {
+  if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; document.getElementById('btnAuto').textContent='自动连投'; }
+  addBatch();
+});
+
+document.getElementById('btnAuto').addEventListener('click', e => {
+  if (state.autoTimer) {
+    clearInterval(state.autoTimer); state.autoTimer = null;
+    e.target.textContent = '自动连投';
+  } else {
+    addBatch();
+    state.autoTimer = setInterval(addBatch, 300);
+    e.target.textContent = '暂停';
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (state.autoTimer) { clearInterval(state.autoTimer); state.autoTimer = null; document.getElementById('btnAuto').textContent='自动连投'; }
+  resetCounts();
+});
+
+['showHist','showPmf','showNorm'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => updateDisplay(state.counts, state.n));
+});
+
+window.addEventListener('resize', () => chart.resize());
+
+// 初始化
+resetCounts();
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
